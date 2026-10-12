@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronDown,
   GraduationCap,
+  LogOut,
   RotateCcw,
   ShieldCheck,
   UserCheck,
@@ -13,8 +14,6 @@ import { useNotification } from '../../context/NotificationContext';
 import { db } from '../../services/db';
 import { UserRole } from '../../types';
 
-import { AuthModal } from './AuthModal';
-
 interface NavbarProps {
   onNavigateLanding?: () => void;
   activeView?: string;
@@ -22,31 +21,30 @@ interface NavbarProps {
 }
 
 const ROLE_LABELS: Record<UserRole, { label: string; badgeBg: string; badgeText: string }> = {
-  student: { label: 'Student', badgeBg: 'bg-blue-100 text-blue-800 border-blue-200', badgeText: 'CSE 4th Year' },
-  recruiter: { label: 'Recruiter', badgeBg: 'bg-indigo-100 text-indigo-800 border-indigo-200', badgeText: 'Microsoft / TCS' },
-  cdc_admin: { label: 'CDC Placement Head', badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200', badgeText: 'Dean Placement' },
-  faculty: { label: 'Faculty', badgeBg: 'bg-purple-100 text-purple-800 border-purple-200', badgeText: 'CSE HOD' },
-  alumni: { label: 'Alumni', badgeBg: 'bg-amber-100 text-amber-800 border-amber-200', badgeText: 'AWS SDE II' },
-  institutional_admin: { label: 'Institutional Admin', badgeBg: 'bg-slate-100 text-slate-800 border-slate-300', badgeText: 'Principal' },
+  student: { label: 'Student', badgeBg: 'bg-blue-100 text-blue-800 border-blue-200', badgeText: 'GMRIT Student' },
+  recruiter: { label: 'Recruiter', badgeBg: 'bg-indigo-100 text-indigo-800 border-indigo-200', badgeText: 'Corporate Partner' },
+  cdc_admin: { label: 'CDC Placement Head', badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-200', badgeText: 'CDC Directorate' },
+  faculty: { label: 'Faculty Mentor', badgeBg: 'bg-purple-100 text-purple-800 border-purple-200', badgeText: 'Faculty' },
+  alumni: { label: 'Alumni Network', badgeBg: 'bg-amber-100 text-amber-800 border-amber-200', badgeText: 'Alumnus' },
+  institutional_admin: { label: 'Institutional Admin', badgeBg: 'bg-slate-100 text-slate-800 border-slate-300', badgeText: 'Academic Council' },
 };
 
 export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView }) => {
-  const { currentUser, loginAsRole, logout } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { notifications, unreadCount, markAsRead, showToast } = useNotification();
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleResetData = () => {
-    if (confirm('Reset all demo data (students, opportunities, applications, assessments) to original default state?')) {
+    if (confirm('Clear all local storage records (users, applications, drives) and reset to clean state?')) {
       db.resetAllDemoData();
-      showToast('Demo Data Reset', 'Platform data has been re-seeded to initial GMRIT demo state.', 'success');
+      logout();
+      showToast('Store Cleared', 'All local storage records cleared. Please register a new account.', 'info');
     }
   };
 
   const currentRole = currentUser?.role || 'student';
-  const roleInfo = ROLE_LABELS[currentRole];
+  const roleInfo = ROLE_LABELS[currentRole] || ROLE_LABELS.student;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
@@ -56,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView
           <div className="flex items-center gap-3">
             <button
               onClick={() => onNavigateLanding && onNavigateLanding()}
-              className="flex items-center gap-2.5 text-left group focus:outline-hidden"
+              className="flex items-center gap-2.5 text-left group focus:outline-hidden cursor-pointer"
               title="Return to SCIC Landing & Vision Portal"
             >
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-900 to-indigo-900 flex items-center justify-center text-white shadow-md shadow-indigo-950/20 group-hover:scale-105 transition-transform">
@@ -73,65 +71,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView
               </div>
             </button>
 
-            {/* Persistence & Campus Status Pill */}
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200 ml-3">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Persistent Campus Store Active</span>
+            {/* Role Badge */}
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-800 text-xs font-semibold border border-indigo-200 ml-3">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{roleInfo.label}</span>
             </div>
           </div>
 
-          {/* Right Action Controls: Role Switcher, Notification, Reset, User Profile */}
+          {/* Right Action Controls: Notification, Clean Data, User Profile */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick Role Switcher Pill */}
-            <div className="relative">
-              <button
-                onClick={() => setShowRoleMenu(!showRoleMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-800 transition-colors shadow-2xs"
-              >
-                <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                <span className="hidden sm:inline text-slate-500 font-normal">Role:</span>
-                <span className="font-semibold text-slate-900">{roleInfo.label}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {showRoleMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                    Switch Test Persona (All 6 Roles)
-                  </div>
-                  {(Object.keys(ROLE_LABELS) as UserRole[]).map(role => {
-                    const item = ROLE_LABELS[role];
-                    const isSelected = currentRole === role;
-                    return (
-                      <button
-                        key={role}
-                        onClick={() => {
-                          loginAsRole(role);
-                          setShowRoleMenu(false);
-                          if (setActiveView) setActiveView('dashboard');
-                          showToast('Role Switched', `Now logged in as ${item.label}`, 'info');
-                        }}
-                        className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                          isSelected ? 'bg-indigo-50/70 font-semibold text-indigo-900' : 'text-slate-700'
-                        }`}
-                      >
-                        <div className="flex flex-col">
-                          <span>{item.label}</span>
-                          <span className="text-[10px] text-slate-400">{item.badgeText}</span>
-                        </div>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
             {/* Notifications Menu */}
             <div className="relative">
               <button
                 onClick={() => setShowNotifMenu(!showNotifMenu)}
-                className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 title="Notifications"
               >
                 <Bell className="w-5 h-5" />
@@ -154,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView
                   </div>
                   <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
                     {notifications.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-slate-400">No notifications right now</div>
+                      <div className="py-6 text-center text-xs text-slate-400">No new notifications</div>
                     ) : (
                       notifications.map(n => (
                         <div
@@ -180,11 +133,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView
               )}
             </div>
 
-            {/* Reset Demo Data Button */}
+            {/* Reset / Wipe Store Button */}
             <button
               onClick={handleResetData}
-              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-              title="Reset Demo Data to Initial GMRIT Defaults"
+              className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              title="Reset Database to Clean State"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -193,32 +146,33 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView
             <div className="relative pl-2 border-l border-slate-200">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity"
+                className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold text-xs flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
                   {currentUser?.name
                     ? currentUser.name
                         .split(' ')
                         .map(n => n[0])
                         .slice(0, 2)
                         .join('')
-                    : 'G'}
+                    : 'U'}
                 </div>
                 <div className="hidden md:flex flex-col text-left">
                   <span className="text-xs font-semibold text-slate-800 leading-tight line-clamp-1">
-                    {currentUser?.name || 'Guest User'}
+                    {currentUser?.name || 'Verified User'}
                   </span>
                   <span className="text-[10px] text-slate-500 leading-none">
-                    {currentUser?.company || currentUser?.department || 'Click for Account'}
+                    {currentUser?.email || roleInfo.badgeText}
                   </span>
                 </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-4 py-2 border-b border-slate-100">
-                    <span className="font-bold text-slate-900 block">{currentUser?.name || 'Guest'}</span>
-                    <span className="text-[11px] text-slate-500 font-mono block">{currentUser?.email || 'Not authenticated'}</span>
+                    <span className="font-bold text-slate-900 block">{currentUser?.name}</span>
+                    <span className="text-[11px] text-slate-500 font-mono block truncate">{currentUser?.email}</span>
                     <span className="text-[10px] uppercase font-bold text-indigo-600 mt-1 inline-block">
                       Role: {roleInfo.label}
                     </span>
@@ -227,23 +181,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView
                   <div className="py-1">
                     <button
                       onClick={() => {
-                        setShowAuthModal(true);
-                        setShowUserMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-50 font-medium text-slate-700 flex items-center gap-2"
-                    >
-                      <UserCheck className="w-4 h-4 text-indigo-600" />
-                      <span>Sign In / Switch Account</span>
-                    </button>
-                    <button
-                      onClick={() => {
                         logout();
                         setShowUserMenu(false);
-                        showToast('Signed Out', 'You have been logged out of SCIC.', 'info');
+                        showToast('Logged Out', 'You have been signed out. Please authenticate with OTP.', 'info');
                       }}
-                      className="w-full text-left px-4 py-2 hover:bg-rose-50 font-medium text-rose-600 flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 hover:bg-rose-50 font-medium text-rose-600 flex items-center gap-2 cursor-pointer"
                     >
-                      <span>Log Out of Session</span>
+                      <LogOut className="w-4 h-4 text-rose-500" />
+                      <span>Log Out Session</span>
                     </button>
                   </div>
                 </div>
@@ -252,7 +197,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateLanding, setActiveView
           </div>
         </div>
       </div>
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </header>
   );
 };

@@ -347,3 +347,82 @@ export interface PlacementDrive {
   contactSpoc?: string;
   notes?: string;
 }
+
+export interface StudentRegistrationData {
+  role: 'student';
+  fullName: string;
+  email: string;
+  phone?: string;
+  rollNumber: string;
+  department: string;
+  degree?: string;
+  academicYear?: string;
+  graduationYear: number;
+  cgpa: number;
+  standingBacklogs: number;
+  targetRole?: string;
+}
+
+export interface RecruiterRegistrationData {
+  role: 'recruiter';
+  fullName: string;
+  email: string;
+  phone?: string;
+  company: string;
+  title?: string;
+  industry?: string;
+  location?: string;
+}
+
+export interface FacultyRegistrationData {
+  role: 'faculty';
+  fullName: string;
+  email: string;
+  phone?: string;
+  department: string;
+  employeeId?: string;
+  title?: string;
+  specialization?: string;
+}
+
+export interface AlumniRegistrationData {
+  role: 'alumni';
+  fullName: string;
+  email: string;
+  phone?: string;
+  department: string;
+  graduationYear: number;
+  company: string;
+  title?: string;
+  location?: string;
+  linkedin?: string;
+}
+
+export interface CDCRegistrationData {
+  role: 'cdc_admin';
+  fullName: string;
+  email: string;
+  phone?: string;
+  employeeId?: string;
+  title?: string;
+  department?: string;
+}
+
+export interface AdminRegistrationData {
+  role: 'institutional_admin';
+  fullName: string;
+  email: string;
+  phone?: string;
+  employeeId?: string;
+  title?: string;
+  department?: string;
+}
+
+export type RegistrationPayload =
+  | StudentRegistrationData
+  | RecruiterRegistrationData
+  | FacultyRegistrationData
+  | AlumniRegistrationData
+  | CDCRegistrationData
+  | AdminRegistrationData;
+

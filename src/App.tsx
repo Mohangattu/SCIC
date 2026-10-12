@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { InstitutionalDashboard } from './features/admin/InstitutionalDashboard';
 import { AlumniDashboard } from './features/alumni/AlumniDashboard';
+import { AuthPortal } from './features/auth/AuthPortal';
 import { CDCDashboard } from './features/cdc/CDCDashboard';
 import { FacultyDashboard } from './features/faculty/FacultyDashboard';
 import { RecruiterDashboard } from './features/recruiter/RecruiterDashboard';
@@ -23,11 +24,17 @@ function AppContent() {
   const [isLanding, setIsLanding] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
 
+  // If user chooses to view the landing/vision page
   if (isLanding) {
     return <LandingPage onEnterApp={() => setIsLanding(false)} />;
   }
 
-  const role = currentUser?.role || 'student';
+  // If not logged in, enforce role registration & OTP authentication portal
+  if (!currentUser) {
+    return <AuthPortal onNavigateLanding={() => setIsLanding(true)} />;
+  }
+
+  const role = currentUser.role;
 
   const renderRoleView = () => {
     switch (role) {

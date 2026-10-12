@@ -1,25 +1,37 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { db, subscribeToDb } from '../services/db';
-import { StudentProfile, User, UserRole } from '../types';
+import { db, generateAndStoreOtp, subscribeToDb, validateRoleEmail, verifyOtpCode } from '../services/db';
+import { RegistrationPayload, StudentProfile, User, UserRole } from '../types';
+
+const CURRENT_USER_KEY = 'scic_gmrit_current_user_v4';
 
 interface AuthContextType {
   currentUser: User | null;
   currentStudentProfile: StudentProfile | null;
   isAuthenticated: boolean;
-  loginAsRole: (role: UserRole) => void;
-  loginWithEmail: (email: string) => boolean;
-  registerUser: (name: string, email: string, role: UserRole, department?: string, company?: string) => void;
+  requestOtp: (email: string, role: UserRole) => { success: boolean; message: string; otp?: string };
+  verifyOtpAndLogin: (email: string, code: string) => { success: boolean; message: string; user?: User };
+  registerUser: (payload: RegistrationPayload) => { success: boolean; message: string; user?: User };
   logout: () => void;
   refreshUserData: () => void;
+  allRegisteredUsers: User[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    // Default to student (Rahul Sharma) for immediate interactive demo experience
-    const users = db.getUsers();
-    return users.find(u => u.id === 'user-student-1') || users[0] || null;
+    try {
+      const saved = localStorage.getItem(CURRENT_USER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Verify user still exists in database
+        const existing = db.getUserById(parsed.id);
+        return existing || null;
+      }
+    } catch (e) {
+      console.warn('Failed to parse current user from storage:', e);
+    }
+    return null;
   });
 
   const [currentStudentProfile, setCurrentStudentProfile] = useState<StudentProfile | null>(() => {
@@ -30,14 +42,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const refreshUserData = () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setCurrentStudentProfile(null);
+      return;
+    }
     const freshUser = db.getUserById(currentUser.id);
     if (freshUser) {
       setCurrentUser(freshUser);
       if (freshUser.role === 'student') {
         const profile = db.getStudentProfile(freshUser.id);
         setCurrentStudentProfile(profile || null);
+      } else {
+        setCurrentStudentProfile(null);
       }
+    } else {
+      setCurrentUser(null);
+      setCurrentStudentProfile(null);
+      localStorage.removeItem(CURRENT_USER_KEY);
     }
   };
 
@@ -48,102 +69,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, [currentUser?.id]);
 
-  const loginAsRole = (role: UserRole) => {
-    const users = db.getUsers();
-    let target = users.find(u => u.role === role);
-    if (!target) {
-      // create a mock for this role if not found
-      target = {
-        id: `user-${role}-demo`,
-        name: `Demo ${role.toUpperCase()}`,
-        email: `${role}@gmrit.edu.in`,
-        role: role,
-        createdAt: new Date().toISOString(),
-      };
-      db.saveUser(target);
+  // Request OTP for Login or Registration
+  const requestOtp = (email: string, role: UserRole): { success: boolean; message: string; otp?: string } => {
+    const validation = validateRoleEmail(role, email);
+    if (!validation.isValid) {
+      return { success: false, message: validation.error || 'Invalid email format' };
     }
-    setCurrentUser(target);
-    if (target.role === 'student') {
-      const prof = db.getStudentProfile(target.id);
-      setCurrentStudentProfile(prof || null);
+
+    const res = generateAndStoreOtp(email, role);
+    return res;
+  };
+
+  // Verify OTP and Log In
+  const verifyOtpAndLogin = (
+    email: string,
+    code: string
+  ): { success: boolean; message: string; user?: User } => {
+    const trimmedEmail = email.trim().toLowerCase();
+    const verification = verifyOtpCode(trimmedEmail, code);
+    if (!verification.isValid) {
+      return { success: false, message: verification.error || 'Invalid OTP code' };
+    }
+
+    // Look up registered user
+    const user = db.getUserByEmail(trimmedEmail);
+    if (!user) {
+      return {
+        success: false,
+        message: 'No registered account found for this email. Please complete registration first.',
+      };
+    }
+
+    setCurrentUser(user);
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+
+    if (user.role === 'student') {
+      const profile = db.getStudentProfile(user.id);
+      setCurrentStudentProfile(profile || null);
     } else {
       setCurrentStudentProfile(null);
     }
+
+    return { success: true, message: `Successfully logged in as ${user.name}`, user };
   };
 
-  const loginWithEmail = (email: string): boolean => {
-    const users = db.getUsers();
-    const found = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (found) {
-      setCurrentUser(found);
-      if (found.role === 'student') {
-        setCurrentStudentProfile(db.getStudentProfile(found.id) || null);
-      } else {
-        setCurrentStudentProfile(null);
-      }
-      return true;
-    }
-    return false;
-  };
-
+  // Register New User
   const registerUser = (
-    name: string,
-    email: string,
-    role: UserRole,
-    department: string = 'Computer Science & Engineering',
-    company?: string
-  ) => {
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name,
-      email,
-      role,
-      department: role === 'student' || role === 'faculty' ? department : undefined,
-      company: role === 'recruiter' || role === 'alumni' ? company : undefined,
-      createdAt: new Date().toISOString(),
-    };
-    db.saveUser(newUser);
-
-    if (role === 'student') {
-      const newStudentProfile: StudentProfile = {
-        userId: newUser.id,
-        fullName: name,
-        email: email,
-        phone: '+91 98480 00000',
-        rollNumber: `22341A05${Math.floor(10 + Math.random() * 89)}`,
-        department: department,
-        degree: 'B.Tech',
-        academicYear: '4th Year (Final Year)',
-        graduationYear: 2025,
-        cgpa: 8.0,
-        standingBacklogs: 0,
-        preferredLocation: 'Hyderabad, Bengaluru',
-        targetRole: 'Software Developer',
-        careerObjective: 'Motivated engineering student at GMRIT seeking industry placement.',
-        skills: [
-          { name: 'JavaScript', category: 'Programming', proficiency: 'Intermediate' },
-          { name: 'Python', category: 'Programming', proficiency: 'Intermediate' },
-          { name: 'Data Structures & Algorithms', category: 'CS Fundamentals', proficiency: 'Intermediate' },
-        ],
-        softSkills: ['Problem Solving', 'Teamwork'],
-        projects: [],
-        experience: [],
-        certifications: [],
-        readinessScore: 65,
-        portfolioPublic: true,
-        publicSlug: name.toLowerCase().replace(/\s+/g, '-'),
-      };
-      db.saveStudentProfile(newStudentProfile);
-      setCurrentStudentProfile(newStudentProfile);
+    payload: RegistrationPayload
+  ): { success: boolean; message: string; user?: User } => {
+    const trimmedEmail = payload.email.trim().toLowerCase();
+    const validation = validateRoleEmail(payload.role, trimmedEmail);
+    if (!validation.isValid) {
+      return { success: false, message: validation.error || 'Email validation failed' };
     }
 
+    // Check if user already exists
+    const existing = db.getUserByEmail(trimmedEmail);
+    if (existing) {
+      return {
+        success: false,
+        message: `An account with ${trimmedEmail} is already registered as ${existing.role.toUpperCase()}. Please log in with OTP instead.`,
+      };
+    }
+
+    // Register user & create corresponding role entity
+    const newUser = db.registerUser(payload);
     setCurrentUser(newUser);
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
+
+    if (newUser.role === 'student') {
+      const profile = db.getStudentProfile(newUser.id);
+      setCurrentStudentProfile(profile || null);
+    } else {
+      setCurrentStudentProfile(null);
+    }
+
+    return {
+      success: true,
+      message: `Account created successfully for ${newUser.name} (${newUser.role}).`,
+      user: newUser,
+    };
   };
 
   const logout = () => {
     setCurrentUser(null);
     setCurrentStudentProfile(null);
+    localStorage.removeItem(CURRENT_USER_KEY);
   };
+
+  const allRegisteredUsers = db.getUsers();
 
   return (
     <AuthContext.Provider
@@ -151,11 +165,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         currentStudentProfile,
         isAuthenticated: !!currentUser,
-        loginAsRole,
-        loginWithEmail,
+        requestOtp,
+        verifyOtpAndLogin,
         registerUser,
         logout,
         refreshUserData,
+        allRegisteredUsers,
       }}
     >
       {children}
