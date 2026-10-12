@@ -1,0 +1,6 @@
+{
+  "name": "SCIC — Smart Campus & Industry Connect System",
+  "description": "AI-powered employability, skill gap intelligence, and industry connect platform for GMR Institute of Technology (GMRIT).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
